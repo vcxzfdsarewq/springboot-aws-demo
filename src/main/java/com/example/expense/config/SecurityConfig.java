@@ -2,6 +2,7 @@ package com.example.expense.config;
 
 import com.example.expense.exception.ApiError;
 import com.example.expense.ratelimit.RateLimitFilter;
+import com.example.expense.ratelimit.ReceiptUploadRateLimitFilter;
 import com.example.expense.security.JwtAuthenticationFilter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
@@ -27,15 +28,18 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final RateLimitFilter rateLimitFilter;
+    private final ReceiptUploadRateLimitFilter receiptUploadRateLimitFilter;
     private final CorsConfigurationSource corsConfigurationSource;
     private final ObjectMapper objectMapper;
 
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
                           RateLimitFilter rateLimitFilter,
+                          ReceiptUploadRateLimitFilter receiptUploadRateLimitFilter,
                           CorsConfigurationSource corsConfigurationSource,
                           ObjectMapper objectMapper) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.rateLimitFilter = rateLimitFilter;
+        this.receiptUploadRateLimitFilter = receiptUploadRateLimitFilter;
         this.corsConfigurationSource = corsConfigurationSource;
         this.objectMapper = objectMapper;
     }
@@ -55,9 +59,10 @@ public class SecurityConfig {
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(authenticationEntryPoint())
                         .accessDeniedHandler(accessDeniedHandler()))
-                // Rate Limit → JWT 認証 の順で UsernamePassword フィルタ前に挿入
+                // 認証前の制限 → JWT 認証 → userId 単位のアップロード制限
                 .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterAfter(jwtAuthenticationFilter, RateLimitFilter.class);
+                .addFilterAfter(jwtAuthenticationFilter, RateLimitFilter.class)
+                .addFilterAfter(receiptUploadRateLimitFilter, JwtAuthenticationFilter.class);
         return http.build();
     }
 
@@ -86,3 +91,4 @@ public class SecurityConfig {
         objectMapper.writeValue(response.getWriter(), body);
     }
 }
+

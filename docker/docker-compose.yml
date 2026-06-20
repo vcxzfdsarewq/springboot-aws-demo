@@ -38,6 +38,31 @@ services:
       timeout: 3s
       retries: 10
 
+  # ローカルの S3 代替 (本番は実 AWS S3)
+  minio:
+    image: minio/minio
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    expose:
+      - "9000"
+    volumes:
+      - minio-data:/data
+
+  # 起動時に領収書バケットを作成して終了する一回限りのジョブ
+  minio-init:
+    image: minio/mc
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 minioadmin minioadmin; do echo 'waiting for minio'; sleep 1; done;
+      mc mb --ignore-existing local/expense-receipts;
+      mc anonymous set none local/expense-receipts;
+      echo 'bucket ready';
+      "
+
   app:
     build:
       context: ..
@@ -51,6 +76,13 @@ services:
       TZ: UTC
       # 本番では Secrets Manager から注入。ローカルは local プロファイルの既定が使われる。
       JWT_SECRET: local-dev-insecure-secret-please-override-32bytes
+      # S3 (ローカルは MinIO)
+      S3_ENDPOINT: http://minio:9000
+      S3_PATH_STYLE: "true"
+      S3_BUCKET: expense-receipts
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      AWS_REGION: ap-northeast-1
       # ブラウザクライアントから使う場合に許可 origin をカンマ区切りで設定:
       # APP_CORS_ALLOWED_ORIGINS: http://localhost:3000
     ports:
@@ -60,6 +92,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
 
 volumes:
   db-data:
+  minio-data:

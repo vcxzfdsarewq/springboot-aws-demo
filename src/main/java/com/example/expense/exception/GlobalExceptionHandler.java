@@ -14,6 +14,7 @@ import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -64,6 +65,18 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleServiceUnavailable(ServiceUnavailableException ex,
                                                              HttpServletRequest req) {
         return build(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage(), req);
+    }
+
+    @ExceptionHandler(InvalidFileException.class)
+    public ResponseEntity<ApiError> handleInvalidFile(InvalidFileException ex, HttpServletRequest req) {
+        return build(HttpStatus.BAD_REQUEST, ex.getMessage(), req);
+    }
+
+    /** マルチパートのサイズ上限超過 → 413。 */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiError> handleMaxUpload(MaxUploadSizeExceededException ex,
+                                                    HttpServletRequest req) {
+        return build(HttpStatus.PAYLOAD_TOO_LARGE, "File exceeds the maximum allowed size", req);
     }
 
     /** 楽観ロック衝突 (承認/却下の同時実行レース)。 */

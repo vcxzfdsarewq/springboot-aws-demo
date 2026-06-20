@@ -10,7 +10,8 @@ Spring Boot で構築する経費管理 REST API。Docker 化し AWS (ECS Fargat
 - [x] **Phase 1**: Spring Boot 基盤 (経費 CRUD + ステータス状態機械 + 楽観ロック)
 - [x] **Phase 2**: Docker 化 (マルチステージ Dockerfile + docker-compose)
 - [x] **Phase 3**: 認証・認可 (Spring Security + JWT + Refresh Token ローテーション + Rate Limit)
-- [ ] Phase 4〜8: S3 / 管理者機能 / ログ / Terraform / CI/CD
+- [x] **Phase 4**: ファイルアップロード (S3 領収書 + IDOR 所有者チェック + presigned URL)
+- [ ] Phase 5〜8: 管理者機能 / ログ / Terraform / CI/CD
 
 ## 技術スタック (Phase 1)
 
@@ -64,10 +65,15 @@ mvn spring-boot:run
 | ロール変更 | PUT | `/api/admin/users/{id}/role` | ADMIN |
 | 経費 CRUD | - | `/api/expenses/**` | USER (所有者) |
 | 申請/取り下げ | POST | `/api/expenses/{id}/submit` `.../withdraw` | USER |
+| 領収書アップロード | POST | `/api/expenses/{id}/receipts` (multipart) | USER (所有者) |
+| 領収書取得 (presigned URL) | GET | `/api/expenses/{id}/receipts/{rid}` | USER(所有者)/ADMIN |
+| 領収書削除 | DELETE | `/api/expenses/{id}/receipts/{rid}` | USER (所有者) |
 
 - 認証: **JWT (Access 15分) + Refresh Token (7日, ローテーション)**。`Authorization: Bearer <accessToken>`
 - ステータス: `DRAFT → PENDING → APPROVED / REJECTED` (不正遷移は 409)、`@Version` 楽観ロック
 - Rate Limit: login 5回/5分・refresh 60回/時 (Redis 共有ストア、超過で 429)
+- 領収書: S3 (ローカルは MinIO) に保存、最大10MB、JPEG/PNG/PDF を**マジックバイト検証**、取得は presigned URL (5分)
+- IDOR 対策: USER は自分の経費の領収書のみ、`receipt.expense_id == path id` を検証 (不一致 404)
 - Swagger UI: `http://localhost:8080/swagger-ui.html`
 - 開発用シードユーザー: `admin@example.com` / `user@example.com` (パスワード `Password123!`)
 
