@@ -49,9 +49,11 @@ class ReceiptIntegrationTest {
     @ServiceConnection
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
 
+    @SuppressWarnings("resource")
     @Container
     static GenericContainer<?> redis = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
 
+    @SuppressWarnings("resource")
     @Container
     static GenericContainer<?> minio = new GenericContainer<>("minio/minio")
             .withCommand("server", "/data")
@@ -73,14 +75,15 @@ class ReceiptIntegrationTest {
 
     @BeforeAll
     static void createBucket() {
-        S3Client client = S3Client.builder()
+        try (S3Client client = S3Client.builder()
                 .endpointOverride(URI.create("http://" + minio.getHost() + ":" + minio.getMappedPort(9000)))
                 .region(Region.US_EAST_1)
                 .credentialsProvider(StaticCredentialsProvider.create(
                         AwsBasicCredentials.create("minioadmin", "minioadmin")))
                 .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
-                .build();
-        client.createBucket(CreateBucketRequest.builder().bucket(BUCKET).build());
+                .build()) {
+            client.createBucket(CreateBucketRequest.builder().bucket(BUCKET).build());
+        }
     }
 
     private static final byte[] PNG =
@@ -163,3 +166,4 @@ class ReceiptIntegrationTest {
                 .andExpect(status().isBadRequest());
     }
 }
+

@@ -117,7 +117,7 @@ class RefreshTokenServiceTest {
         AuthResponse winner = AuthResponse.bearer("a2", "r2", 900, 2L, Role.USER);
 
         // 1回目(grace判定前)=miss、2回目(revoked内の再確認)=hit
-        when(replayStore.get(hash)).thenReturn(Optional.empty(), Optional.of(winner));
+        when(replayStore.get(hash)).thenReturn(Optional.empty()).thenReturn(Optional.of(winner));
         when(refreshTokenRepository.findByTokenHashForUpdate(hash)).thenReturn(Optional.of(revoked));
 
         AuthResponse res = service.rotate(presented);
@@ -148,3 +148,4 @@ class RefreshTokenServiceTest {
         assertThat(token.isRevoked()).isTrue();
     }
 }
+

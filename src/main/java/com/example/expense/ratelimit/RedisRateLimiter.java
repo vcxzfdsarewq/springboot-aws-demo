@@ -18,11 +18,12 @@ import org.springframework.stereotype.Component;
 public class RedisRateLimiter {
 
     // INCR して、最初の1回だけ EXPIRE を設定。現在値と残TTLを返す (原子的)。
-    private static final RedisScript<List> SCRIPT = new DefaultRedisScript<>(
+    @SuppressWarnings("unchecked")
+    private static final RedisScript<List<Long>> SCRIPT = new DefaultRedisScript<>(
             "local c = redis.call('INCR', KEYS[1]) "
             + "if c == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end "
             + "return {c, redis.call('TTL', KEYS[1])}",
-            List.class);
+            (Class<List<Long>>) (Class<?>) List.class);
 
     private final StringRedisTemplate redis;
 
@@ -35,7 +36,6 @@ public class RedisRateLimiter {
      * @param limit          ウィンドウ内の許可回数
      * @param windowSeconds  ウィンドウ長 (秒)
      */
-    @SuppressWarnings("unchecked")
     public Result tryAcquire(String key, int limit, int windowSeconds) {
         List<Long> result = redis.execute(SCRIPT, List.of(key),
                 String.valueOf(windowSeconds));

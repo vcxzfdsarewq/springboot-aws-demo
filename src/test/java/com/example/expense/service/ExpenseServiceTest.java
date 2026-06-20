@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Optional;
+import java.util.List;
 
 import com.example.expense.dto.request.ExpenseRequest;
 import com.example.expense.entity.Expense;
@@ -19,6 +20,8 @@ import com.example.expense.exception.InvalidStateTransitionException;
 import com.example.expense.exception.ResourceNotFoundException;
 import com.example.expense.repository.ExpenseRepository;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -170,4 +173,95 @@ class ExpenseServiceTest {
         assertThatThrownBy(() -> service.approve(ADMIN_ID, EXPENSE_ID))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
+    @Test
+    void adminListCanFilterByStatus() {
+        Expense pending = expenseWithStatus(ExpenseStatus.PENDING);
+        when(expenseRepository.findByStatus(ExpenseStatus.PENDING, PageRequest.of(0, 20)))
+                .thenReturn(new PageImpl<>(List.of(pending)));
+
+        var page = service.listForAdmin(ExpenseStatus.PENDING, PageRequest.of(0, 20));
+
+        assertThat(page.getTotalElements()).isEqualTo(1);
+        assertThat(page.getContent().get(0).getStatus()).isEqualTo(ExpenseStatus.PENDING);
+    }
+
+    @Test
+    void monthlyReportDefaultsToApprovedStatus() {
+        when(expenseRepository.aggregateMonthly(LocalDate.of(2026, 6, 1),
+                LocalDate.of(2026, 7, 1), null, ExpenseStatus.APPROVED))
+                .thenReturn(new MonthlyAggregateStub(2L, new BigDecimal("3000.00")));
+
+        var result = service.monthlyReport(2026, 6, null, null);
+
+        assertThat(result.year()).isEqualTo(2026);
+        assertThat(result.month()).isEqualTo(6);
+        assertThat(result.count()).isEqualTo(2);
+        assertThat(result.totalAmount()).isEqualByComparingTo("3000.00");
+    }
+
+    @Test
+    void monthlyReportSupportsAllStatuses() {
+        when(expenseRepository.aggregateMonthly(LocalDate.of(2026, 6, 1),
+                LocalDate.of(2026, 7, 1), USER_ID, null))
+                .thenReturn(new MonthlyAggregateStub(0L, null));
+
+        var result = service.monthlyReport(2026, 6, USER_ID, "ALL");
+
+        assertThat(result.count()).isZero();
+        assertThat(result.totalAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void categoryReportReturnsAmountDescendingRowsFromRepository() {
+        LocalDate from = LocalDate.of(2026, 1, 1);
+        LocalDate to = LocalDate.of(2026, 6, 30);
+        when(expenseRepository.aggregateByCategory(from, to, USER_ID, ExpenseStatus.APPROVED))
+                .thenReturn(List.of(new CategoryAggregateStub("交通費", 2L, new BigDecimal("5000.00"))));
+
+        var result = service.categoryReport(from, to, USER_ID, "APPROVED");
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).category()).isEqualTo("交通費");
+        assertThat(result.get(0).count()).isEqualTo(2);
+        assertThat(result.get(0).totalAmount()).isEqualByComparingTo("5000.00");
+    }
+
+    @Test
+    void categoryReportRejectsInvalidRange() {
+        assertThatThrownBy(() -> service.categoryReport(LocalDate.of(2026, 7, 1),
+                LocalDate.of(2026, 6, 30), null, "APPROVED"))
+                .isInstanceOf(com.example.expense.exception.BadRequestException.class);
+    }
+
+    private record MonthlyAggregateStub(long expenseCount, BigDecimal totalAmount)
+            implements ExpenseRepository.MonthlyExpenseAggregate {
+        @Override
+        public long getExpenseCount() {
+            return expenseCount;
+        }
+
+        @Override
+        public BigDecimal getTotalAmount() {
+            return totalAmount;
+        }
+    }
+
+    private record CategoryAggregateStub(String category, long expenseCount, BigDecimal totalAmount)
+            implements ExpenseRepository.CategoryExpenseAggregate {
+        @Override
+        public String getCategory() {
+            return category;
+        }
+
+        @Override
+        public long getExpenseCount() {
+            return expenseCount;
+        }
+
+        @Override
+        public BigDecimal getTotalAmount() {
+            return totalAmount;
+        }
+    }
 }
+

@@ -48,6 +48,7 @@ class ExpenseApiIntegrationTest {
     @ServiceConnection
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
 
+    @SuppressWarnings("resource")
     @Container
     static GenericContainer<?> redis = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
 
@@ -191,3 +192,4 @@ class ExpenseApiIntegrationTest {
                 .isInstanceOf(ObjectOptimisticLockingFailureException.class);
     }
 }
+
