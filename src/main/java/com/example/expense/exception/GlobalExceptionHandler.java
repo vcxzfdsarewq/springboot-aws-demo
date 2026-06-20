@@ -127,7 +127,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleUnexpected(Exception ex, HttpServletRequest req) {
-        log.error("Unhandled exception at {}", req.getRequestURI(), ex);
+        log.error("Unhandled exception type={} path={}", ex.getClass().getName(), req.getRequestURI());
         return build(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error", req);
     }
 

@@ -59,13 +59,24 @@ app:
 # Actuator: ヘルスチェックのみ公開 (機微エンドポイントは閉じる)
 management:
   endpoints:
+    enabled-by-default: false
     web:
       exposure:
         include: health
   endpoint:
     health:
+      enabled: true
+      show-details: never
       probes:
         enabled: true
+    env:
+      enabled: false
+    heapdump:
+      enabled: false
+    loggers:
+      enabled: false
+    shutdown:
+      enabled: false
 
 springdoc:
   swagger-ui:
