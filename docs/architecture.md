@@ -326,8 +326,7 @@ springboot-aws-demo/
 │   └── workflows/
 │       ├── ci.yml              ← feature/PR 時のテスト
 │       └── deploy.yml          ← main マージ→staging自動 / production手動承認
-├── build.gradle.kts
-├── settings.gradle.kts
+├── pom.xml
 └── README.md
 ```
 

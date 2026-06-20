@@ -1,0 +1,62 @@
+# ローカル開発用スタック: PostgreSQL + Redis + アプリ。
+# 使い方: docker compose -f docker/docker-compose.yml up --build
+#
+# Redis は Phase 3 (Rate Limit / Refresh Token リプレイ) で使用する。
+# 本番同等の依存をローカルでも揃えるため Phase 2 から含める。
+
+name: expense-api
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: expense
+      POSTGRES_PASSWORD: expense
+      POSTGRES_DB: expense
+      TZ: UTC
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U expense -d expense"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "no"]
+    # アプリは同一ネットワーク内で redis:6379 に接続するため、ホスト公開は不要。
+    # ホストから触りたい場合: docker compose -f docker/docker-compose.yml exec redis redis-cli
+    # (Windows の WinNAT 予約により 6379/6380 のホスト bind が失敗するため公開しない)
+    expose:
+      - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/expense
+      DB_USERNAME: expense
+      DB_PASSWORD: expense
+      TZ: UTC
+      # Phase 3 で使用予定:
+      # REDIS_HOST: redis
+      # REDIS_PORT: 6379
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  db-data:

@@ -1,0 +1,16 @@
+# ビルド成果物はマルチステージのビルダー側で生成するため除外
+target/
+
+.git/
+.gitignore
+.idea/
+*.iml
+.vscode/
+
+docs/
+README.md
+*.md
+
+# ローカル/秘密情報
+.env
+*.log

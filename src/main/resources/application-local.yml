@@ -1,0 +1,4 @@
+# local プロファイル: 開発用シード (db/seed) を追加で読み込む。
+spring:
+  flyway:
+    locations: classpath:db/migration,classpath:db/seed

@@ -291,7 +291,7 @@ Docker コンテナとして AWS (ECS Fargate) にデプロイし、本番運用
 | Rate Limit | Bucket4j + Redis (lettuce) |
 | API ドキュメント | SpringDoc OpenAPI (Swagger UI) |
 | テスト | JUnit 5 + Mockito + Testcontainers |
-| ビルド | Gradle (Kotlin DSL) |
+| ビルド | Maven (JDK25環境のため。`--release 21` で Java 21 バイトコードを生成) |
 | コンテナ | Docker + docker-compose |
 | クラウド | AWS (ECS Fargate, RDS, ElastiCache for Redis, S3, ALB, WAF, CloudWatch, Secrets Manager) |
 | IaC | Terraform |
