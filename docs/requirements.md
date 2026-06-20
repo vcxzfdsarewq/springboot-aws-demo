@@ -204,6 +204,7 @@ Docker コンテナとして AWS (ECS Fargate) にデプロイし、本番運用
 - ローテーション + 再利用検知でトークン漏洩時に失効可能 (詳細は [3.4](#34-refresh_tokens-テーブル))
 - パスワードは BCrypt ハッシュ
 - ロールベースアクセス制御 (RBAC): USER / ADMIN
+- **ロール変更時のトークン整合性**: Access Token はステートレス検証で role を埋め込むため、ロール変更後も **発行済み Access Token は最大15分 (TTL) まで旧権限が残る**ことを許容する。ただしロール変更時に当該ユーザーの **Refresh Token を全失効**させ、新しい権限のトークンで再ログインを強制する (15分以内に完全に新権限へ収束)。厳密な即時反映が必要になった場合は token version / issued-after 検証を追加する
 
 ### 4.2 ファイルストレージ
 - AWS S3 に領収書画像を保存
@@ -229,9 +230,10 @@ Docker コンテナとして AWS (ECS Fargate) にデプロイし、本番運用
 
 ### 4.5 セキュリティ
 - HTTPS (ALB で TLS 終端)
-- CORS 設定
+- **CORS**: 許可 origin は環境変数 `APP_CORS_ALLOWED_ORIGINS` (カンマ区切り) で注入。既定は空 = クロスオリジン不可。許可メソッド/ヘッダは固定 (GET/POST/PUT/DELETE/OPTIONS、Authorization/Content-Type)
 - SQL Injection / XSS 対策 (Spring の標準機能)
 - Secrets Manager で DB パスワード・JWT 秘密鍵を管理
+- **JWT 秘密鍵は fail-fast**: 既定値を持たず、prod で `JWT_SECRET` 未設定なら起動失敗。開発用の既定は local プロファイルにのみ置く
 
 #### Rate Limiting
 
@@ -242,18 +244,20 @@ Docker コンテナとして AWS (ECS Fargate) にデプロイし、本番運用
 | AWS WAF (ALB前段) | 全リクエスト | クライアントIP | 例: 2000 req / 5分 | DDoS・ボット・粗いIP制限 |
 | アプリ層 (Bucket4j) | 認証・アップロード等のコスト高API | エンドポイント別 | 下表 | ブルートフォース・乱用防止 |
 
-アプリ層の代表的なポリシー (Bucket4j、ストアは **ElastiCache for Redis** で全タスク共有):
+アプリ層の代表的なポリシー (Redis 共有ストアで全タスク共有。実装は Redis Lua 固定ウィンドウ):
 
-| エンドポイント | キー | 制限 |
-|--------------|------|------|
-| `POST /api/auth/login` | IP + email | 5回 / 5分 (失敗時)。超過で 429 + 一時ロック |
-| `POST /api/auth/refresh` | userId | 60回 / 時 |
-| `POST /api/expenses/{id}/receipts` | userId | 30回 / 時 (S3コスト保護) |
-| その他一般API | userId | 600回 / 分 |
+| エンドポイント | キー | 制限 | 実装 |
+|--------------|------|------|------|
+| `POST /api/auth/login` | IP + email | **失敗時のみ** 5回 / 5分。成功でリセット。超過で 429 | AuthService 内で判定 (ボディの email が必要なため) |
+| `POST /api/auth/refresh` | IP | 全試行 60回 / 時 | RateLimitFilter |
+| `POST /api/expenses/{id}/receipts` | userId | 30回 / 時 (S3コスト保護) | Phase 4 |
+| その他一般API | userId | 600回 / 分 | (将来) |
 
-> **整合性の前提**: 本構成は ECS を **2タスク (Multi-AZ)** で稼働させる ([4.7](#47-パフォーマンス) 参照)。インメモリのカウンタはタスクごとに独立するため、複数タスクではログイン試行制限がタスク数ぶん緩くなり回避されてしまう。したがって **アプリ層 Rate Limit は最初から Redis 共有ストア (Bucket4j + lettuce) を必須**とし、インメモリ実装は採用しない。
+> **login の数え方**: ブルートフォース対策として **認証失敗時のみ** `IP + email` で加算し、成功でカウンタをクリアする。これにより正常ログインの連続では 429 にならず、同一 NAT 配下の別ユーザー(別 email)も巻き込まない。`refresh` は認証前でボディ依存が無いため IP 単位の全試行カウントとする。
 >
-> Redis を立てない MVP の選択肢として、アプリ層を省き **WAF のレートベースルール (IP単位) のみ**に寄せることも可。ただしその場合、ログインのブルートフォース制限は「IP+email単位の厳密な失敗カウント」ができず IP 単位の粗い制限に留まる点を許容する必要がある。**本プロジェクトはログイン保護を重視するため Redis 共有ストア方式を採用する。**
+> **整合性の前提**: 本構成は ECS を **2タスク (Multi-AZ)** で稼働させる ([4.7](#47-パフォーマンス))。インメモリのカウンタはタスクごとに独立し制限が緩むため、**Redis 共有ストアを必須**とする (インメモリ不使用)。実装は bucket4j-redis の配線を避け Redis Lua の固定ウィンドウで同等の原子的共有カウントを行う。
+>
+> **Redis 障害時のポリシー**: 認証系の Rate Limit は **fail-closed** (Redis 不通なら login は 503、refresh は 503) とし、ブルートフォース防御を無効化させない。一方、Refresh ローテーションのリプレイキャッシュ(冪等再送の最適化)は **fail-open** (ミス扱いでローテーション自体は継続)。両者は構造化レスポンス (503/429) で区別する。
 
 ### 4.6 CI/CD
 - GitHub Actions

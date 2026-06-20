@@ -2,3 +2,8 @@
 spring:
   flyway:
     locations: classpath:db/migration,classpath:db/seed
+
+# 開発用の固定シークレット (32バイト以上)。本番では使わない。
+app:
+  auth:
+    jwt-secret: local-dev-insecure-secret-please-override-32bytes

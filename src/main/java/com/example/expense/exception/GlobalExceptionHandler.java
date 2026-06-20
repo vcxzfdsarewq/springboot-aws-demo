@@ -9,6 +9,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -28,10 +30,40 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.UNAUTHORIZED, ex.getMessage(), req);
     }
 
+    /** メソッドセキュリティ (@PreAuthorize) による認可失敗 → 403。 */
+    @ExceptionHandler({AccessDeniedException.class, AuthorizationDeniedException.class})
+    public ResponseEntity<ApiError> handleAccessDenied(RuntimeException ex, HttpServletRequest req) {
+        return build(HttpStatus.FORBIDDEN, "Access denied", req);
+    }
+
     @ExceptionHandler(InvalidStateTransitionException.class)
     public ResponseEntity<ApiError> handleInvalidTransition(InvalidStateTransitionException ex,
                                                             HttpServletRequest req) {
         return build(HttpStatus.CONFLICT, ex.getMessage(), req);
+    }
+
+    @ExceptionHandler(DuplicateResourceException.class)
+    public ResponseEntity<ApiError> handleDuplicate(DuplicateResourceException ex,
+                                                    HttpServletRequest req) {
+        return build(HttpStatus.CONFLICT, ex.getMessage(), req);
+    }
+
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ResponseEntity<ApiError> handleTooManyRequests(TooManyRequestsException ex,
+                                                          HttpServletRequest req) {
+        ApiError body = ApiError.of(HttpStatus.TOO_MANY_REQUESTS.value(),
+                HttpStatus.TOO_MANY_REQUESTS.getReasonPhrase(), ex.getMessage(), req.getRequestURI());
+        ResponseEntity.BodyBuilder builder = ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS);
+        if (ex.getRetryAfterSeconds() > 0) {
+            builder.header("Retry-After", String.valueOf(ex.getRetryAfterSeconds()));
+        }
+        return builder.body(body);
+    }
+
+    @ExceptionHandler(ServiceUnavailableException.class)
+    public ResponseEntity<ApiError> handleServiceUnavailable(ServiceUnavailableException ex,
+                                                             HttpServletRequest req) {
+        return build(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage(), req);
     }
 
     /** 楽観ロック衝突 (承認/却下の同時実行レース)。 */

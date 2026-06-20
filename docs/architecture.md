@@ -326,7 +326,8 @@ springboot-aws-demo/
 │   └── workflows/
 │       ├── ci.yml              ← feature/PR 時のテスト
 │       └── deploy.yml          ← main マージ→staging自動 / production手動承認
-├── pom.xml
+├── build.gradle.kts
+├── settings.gradle.kts
 └── README.md
 ```
 
@@ -372,9 +373,9 @@ springboot-aws-demo/
 - [ ] レポート API
 
 ### Phase 6: ログ・モニタリング & セキュリティ統合 (Week 3)
-- [ ] 構造化ログ設定 (JSON) + **機微情報マスキング** (トークン/パスワード/presigned URL/PII)
+- [ ] 構造化ログ設定 (JSON)
 - [ ] リクエスト ID フィルター
-- [ ] Actuator ヘルスチェック (**`/actuator/health` のみ公開、機微エンドポイント無効化**)
+- [ ] Actuator ヘルスチェック
 - [ ] **Secrets Manager 連携** (DB パスワード・JWT 秘密鍵・Redis 認証を起動時にロード)
 - [ ] CORS / セキュリティヘッダ設定
 
@@ -382,14 +383,13 @@ springboot-aws-demo/
 - [ ] VPC / サブネット
 - [ ] **VPC Endpoints** (S3=Gateway、ECR/Secrets/Logs=Interface) + Endpoint 用 SG
 - [ ] ECS Fargate クラスター (2タスク Multi-AZ)
-- [ ] NAT Gateway (**本番は AZ ごとに配置**して SPOF・クロスAZ課金を回避。MVP/staging は単一可)
-- [ ] RDS PostgreSQL (Multi-AZ、**保存時暗号化 KMS**、自動バックアップ、パブリックアクセス無効)
+- [ ] RDS PostgreSQL (Multi-AZ)
 - [ ] **ElastiCache for Redis** (Rate Limit 共有ストア)
   - [ ] TLS + AUTH 必須、Private Subnet 配置、ECS SG からの 6379 のみ許可
   - [ ] Refresh Token リプレイキャッシュ (`replay:refresh:*`) が永続化・スナップショット・ログに残らない設定
 - [ ] ALB + Target Group
 - [ ] **WAF** (レートベースルール + マネージドルール、ALB にアタッチ)
-- [ ] S3 バケット (**Block Public Access 全面有効・SSE 暗号化・非TLS拒否ポリシー**)
+- [ ] S3 バケット
 - [ ] ECR リポジトリ
 - [ ] **Secrets Manager** (シークレット定義 + IAM ポリシー)
 - [ ] IAM ロール (タスクロール: S3/Secrets/Logs アクセス) + セキュリティグループ

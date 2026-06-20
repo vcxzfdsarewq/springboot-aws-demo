@@ -9,7 +9,7 @@ Spring Boot で構築する経費管理 REST API。Docker 化し AWS (ECS Fargat
 - [x] **Phase 0**: 要件定義・アーキテクチャ設計
 - [x] **Phase 1**: Spring Boot 基盤 (経費 CRUD + ステータス状態機械 + 楽観ロック)
 - [x] **Phase 2**: Docker 化 (マルチステージ Dockerfile + docker-compose)
-- [ ] Phase 3: 認証・認可 (JWT / Refresh Token)
+- [x] **Phase 3**: 認証・認可 (Spring Security + JWT + Refresh Token ローテーション + Rate Limit)
 - [ ] Phase 4〜8: S3 / 管理者機能 / ログ / Terraform / CI/CD
 
 ## 技術スタック (Phase 1)
@@ -53,27 +53,34 @@ mvn spring-boot:run
 
 ## API (Phase 1)
 
-| 機能 | メソッド | パス |
-|------|---------|------|
-| 経費登録 | POST | `/api/expenses` |
-| 経費一覧 (自分の) | GET | `/api/expenses?page=0&size=20` |
-| 経費詳細 | GET | `/api/expenses/{id}` |
-| 経費更新 | PUT | `/api/expenses/{id}` |
-| 経費削除 | DELETE | `/api/expenses/{id}` |
-| 申請 | POST | `/api/expenses/{id}/submit` |
-| 取り下げ | POST | `/api/expenses/{id}/withdraw` |
+| 機能 | メソッド | パス | 認可 |
+|------|---------|------|------|
+| サインアップ | POST | `/api/auth/signup` | 公開 |
+| ログイン | POST | `/api/auth/login` | 公開 |
+| トークン更新 | POST | `/api/auth/refresh` | 公開 (Refresh Token) |
+| ログアウト | POST | `/api/auth/logout` | 公開 (Refresh Token) |
+| プロフィール | GET | `/api/users/me` | USER/ADMIN |
+| ユーザー一覧 | GET | `/api/users` | ADMIN |
+| ロール変更 | PUT | `/api/admin/users/{id}/role` | ADMIN |
+| 経費 CRUD | - | `/api/expenses/**` | USER (所有者) |
+| 申請/取り下げ | POST | `/api/expenses/{id}/submit` `.../withdraw` | USER |
 
-- ステータス: `DRAFT → PENDING → APPROVED / REJECTED` (不正遷移は 409)
-- 承認/却下の同時実行は `@Version` 楽観ロックで防止 (衝突は 409)
+- 認証: **JWT (Access 15分) + Refresh Token (7日, ローテーション)**。`Authorization: Bearer <accessToken>`
+- ステータス: `DRAFT → PENDING → APPROVED / REJECTED` (不正遷移は 409)、`@Version` 楽観ロック
+- Rate Limit: login 5回/5分・refresh 60回/時 (Redis 共有ストア、超過で 429)
 - Swagger UI: `http://localhost:8080/swagger-ui.html`
-
-> **Phase 1 の暫定認証**: Spring Security は Phase 3 で導入します。それまで操作ユーザーは
-> リクエストヘッダ `X-User-Id` で指定します (例: `-H "X-User-Id: 2"`)。Phase 3 で SecurityContext に置き換えます。
+- 開発用シードユーザー: `admin@example.com` / `user@example.com` (パスワード `Password123!`)
 
 ### 例
 
 ```bash
+# ログインしてアクセストークン取得
+TOKEN=$(curl -s -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"Password123!"}' | jq -r .accessToken)
+
+# トークンを付けて経費登録
 curl -X POST http://localhost:8080/api/expenses \
-  -H "Content-Type: application/json" -H "X-User-Id: 2" \
+  -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
   -d '{"title":"タクシー代","amount":1200.00,"category":"交通費","expenseDate":"2026-06-20"}'
 ```

@@ -7,6 +7,15 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/expense}
     username: ${DB_USERNAME:expense}
     password: ${DB_PASSWORD:expense}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2s
+    web:
+      pageable:
+        default-page-size: 20
+        max-page-size: 100
   jpa:
     open-in-view: false
     hibernate:
@@ -21,11 +30,18 @@ spring:
     # 本番含む既定は versioned migration のみ。
     # 開発用シードは local/test プロファイルで db/seed を追加する (application-local.yml)。
     locations: classpath:db/migration
-  data:
-    web:
-      pageable:
-        default-page-size: 20
-        max-page-size: 100
+
+# 認証設定。本番では JWT_SECRET を Secrets Manager から注入する。
+# 既定値を置かないため、prod で JWT_SECRET 未設定なら起動失敗 (fail-fast)。
+# 開発用の既定は application-local.yml にのみ置く。
+app:
+  auth:
+    jwt-secret: ${JWT_SECRET}
+    access-token-ttl-seconds: ${ACCESS_TOKEN_TTL:900}
+    refresh-token-ttl-seconds: ${REFRESH_TOKEN_TTL:604800}
+  cors:
+    # カンマ区切りの許可 origin。既定は空 (クロスオリジン不可)。
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:}
 
 # Actuator: ヘルスチェックのみ公開 (機微エンドポイントは閉じる)
 management:
