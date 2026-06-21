@@ -11,7 +11,12 @@ Spring Boot で構築する経費管理 REST API。Docker 化し AWS (ECS Fargat
 - [x] **Phase 2**: Docker 化 (マルチステージ Dockerfile + docker-compose)
 - [x] **Phase 3**: 認証・認可 (Spring Security + JWT + Refresh Token ローテーション + Rate Limit)
 - [x] **Phase 4**: ファイルアップロード (S3 領収書 + IDOR 所有者チェック + presigned URL)
-- [ ] Phase 5〜8: 管理者機能 / ログ / Terraform / CI/CD
+- [x] **Phase 5**: 管理者機能 (承認/却下 + 月別・カテゴリ別レポート)
+- [x] **Phase 6**: ログ・セキュリティ (構造化ログ + リクエストID + アップロードRate Limit)
+- [x] **Phase 7**: Terraform + AWS (VPC/ECS Fargate/RDS/ElastiCache/S3/ALB/WAF/Secrets) — [terraform/](terraform/)
+- [x] **Phase 8**: CI/CD (GitHub Actions → ECR → ECS、OIDC・手動承認) — [docs/cicd.md](docs/cicd.md)
+
+🎉 全フェーズ完了
 
 ## 技術スタック (Phase 1)
 

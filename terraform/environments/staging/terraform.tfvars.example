@@ -1,0 +1,4 @@
+# cp terraform.tfvars.example terraform.tfvars して値を埋める
+# ECR は IMMUTABLE タグのため :latest は不可。git SHA かタイムスタンプの一意タグを使う。
+container_image      = "123456789012.dkr.ecr.ap-northeast-1.amazonaws.com/expense-api:git-a1b2c3d"
+receipts_bucket_name = "expense-staging-receipts-123456789012"

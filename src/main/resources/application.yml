@@ -11,6 +11,10 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      # ElastiCache は transit encryption + AUTH。ローカル MinIO/Redis は無効。
+      password: ${REDIS_PASSWORD:}
+      ssl:
+        enabled: ${REDIS_SSL:false}
       timeout: 2s
     web:
       pageable:

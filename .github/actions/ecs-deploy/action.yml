@@ -1,0 +1,57 @@
+name: ECS deploy
+description: 現在のタスク定義のイメージだけ差し替えて新リビジョンを登録し、サービスを更新する
+
+inputs:
+  cluster:
+    description: ECS クラスター名
+    required: true
+  service:
+    description: ECS サービス名
+    required: true
+  task-family:
+    description: タスク定義ファミリ名
+    required: true
+  image:
+    description: 新しいコンテナイメージ URI
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Register new task definition revision and update service
+      shell: bash
+      env:
+        CLUSTER: ${{ inputs.cluster }}
+        SERVICE: ${{ inputs.service }}
+        FAMILY: ${{ inputs.task-family }}
+        IMAGE: ${{ inputs.image }}
+      run: |
+        set -euo pipefail
+
+        echo "Fetching current task definition: $FAMILY"
+        aws ecs describe-task-definition --task-definition "$FAMILY" \
+          --query taskDefinition > current.json
+
+        # 再登録できないフィールドを除去し、先頭コンテナのイメージを差し替える
+        jq --arg IMG "$IMAGE" '
+          .containerDefinitions[0].image = $IMG
+          | del(.taskDefinitionArn, .revision, .status, .requiresAttributes,
+                .compatibilities, .registeredAt, .registeredBy)
+        ' current.json > new.json
+
+        echo "Registering new revision with image: $IMAGE"
+        NEW_TD_ARN=$(aws ecs register-task-definition \
+          --cli-input-json file://new.json \
+          --query 'taskDefinition.taskDefinitionArn' --output text)
+        echo "Registered: $NEW_TD_ARN"
+
+        echo "Updating service $SERVICE on cluster $CLUSTER"
+        aws ecs update-service \
+          --cluster "$CLUSTER" \
+          --service "$SERVICE" \
+          --task-definition "$NEW_TD_ARN" \
+          --force-new-deployment >/dev/null
+
+        echo "Waiting for service to stabilize..."
+        aws ecs wait services-stable --cluster "$CLUSTER" --services "$SERVICE"
+        echo "Deploy complete."

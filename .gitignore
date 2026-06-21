@@ -28,3 +28,13 @@ Thumbs.db
 # Spring Boot
 *.original
 HELP.md
+
+# Local tooling (downloaded terraform binary)
+.tools/
+
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+**/terraform.tfvars
