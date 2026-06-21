@@ -32,6 +32,9 @@ jobs:
   build-push:
     name: Build & push image to ECR
     needs: test
+    # AWS の build 用 OIDC ロール (AWS_BUILD_ROLE_ARN) が未設定なら deploy 系をスキップ。
+    # → AWS セットアップ前は main push で赤くならず、test gate のみ実行される。
+    if: ${{ vars.AWS_BUILD_ROLE_ARN != '' }}
     runs-on: ubuntu-latest
     permissions:
       id-token: write # OIDC
